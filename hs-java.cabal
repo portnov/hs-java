@@ -1,5 +1,5 @@
 Name:           hs-java
-Version:        0.3.4
+Version:        0.4.0
 Cabal-Version:  >= 1.6
 License:        BSD3
 License-File:   LICENSE
@@ -11,6 +11,9 @@ Build-Type:     Simple
 Description:    This package declares data types for Java .class files format and functions
                 to assemble/disassemble Java bytecode. See dump-class.hs, rebuild-class.hs,
                 TestGen.hs for examples of usage.
+                .
+                As of version 0.4.0, all generator functions can work with any
+                instance of GeneratorMonad class, not only MonadState GState.
 Bug-reports: http://redmine.iportnov.ru/projects/hs-java/
 
 Extra-source-files: dump-class.hs

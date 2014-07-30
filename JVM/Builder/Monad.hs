@@ -10,8 +10,9 @@
 module JVM.Builder.Monad
   (GState (..),
    emptyGState,
+   GeneratorMonad (..),
    Generator (..),
-   Generate, GenerateIO,
+   Generate (..), GenerateIO (..),
    addToPool,
    i0, i1, i8,
    newMethod,
@@ -63,13 +64,35 @@ emptyGState = GState {
   locals = 0,
   classPath = []}
 
-class (Monad (g e), MonadState GState (g e)) => Generator e g where
+class Monad m => GeneratorMonad m where
+  getGState :: m GState
+  putGState :: GState -> m ()
+
+instance MonadState GState m => GeneratorMonad m where
+  getGState = St.get
+  putGState = St.put
+
+modifyGState :: GeneratorMonad m => (GState -> GState) -> m ()
+modifyGState fn = do
+  st <- getGState
+  putGState $ fn st
+
+getsGState :: GeneratorMonad m => (GState -> a) -> m a
+getsGState fn = do
+  st <- getGState
+  return $ fn st
+
+class (Monad (g e), GeneratorMonad (g e)) => Generator e g where
   throwG :: (Exception x, Throws x e) => x -> g e a
 
 -- | Generate monad
 newtype Generate e a = Generate {
   runGenerate :: EMT e (State GState) a }
   deriving (Monad, MonadState GState)
+
+-- instance GeneratorMonad (Generate e) where
+--   getGState = Generate $ St.get
+--   putGState = Generate . St.put
 
 instance MonadState st (EMT e (StateT st IO)) where
   get = lift St.get
@@ -82,7 +105,11 @@ instance MonadState st (EMT e (State st)) where
 -- | IO version of Generate monad
 newtype GenerateIO e a = GenerateIO {
   runGenerateIO :: EMT e (StateT GState IO) a }
-  deriving (Monad, MonadState GState, MonadIO)
+  deriving (Monad, MonadIO, MonadState GState)
+
+-- instance GeneratorMonad (GenerateIO e) where
+--   getGState = GenerateIO $ St.get
+--   putGState = GenerateIO . St.put
 
 instance MonadIO (EMT e (StateT GState IO)) where
   liftIO action = lift $ liftIO action
@@ -111,24 +138,24 @@ execGenerate cp (Generate emt) = do
 withClassPath :: ClassPath () -> GenerateIO e ()
 withClassPath cp = do
   res <- liftIO $ execClassPath cp
-  st <- St.get
-  St.put $ st {classPath = res}
+  st <- getGState
+  putGState $ st {classPath = res}
 
 -- | Add a constant to pool
 addItem :: (Generator e g) => Constant Direct -> g e Word16
 addItem c = do
-  pool <- St.gets currentPool
+  pool <- getsGState currentPool
   case lookupPool c pool of
     Just i -> return i
     Nothing -> do
-      i <- St.gets nextPoolIndex
+      i <- getsGState nextPoolIndex
       let pool' = M.insert i c pool
           i' = if long c
                  then i+2
                  else i+1
-      st <- St.get
-      St.put $ st {currentPool = pool',
-                   nextPoolIndex = i'}
+      modifyGState $ \st -> 
+            st {currentPool = pool',
+                nextPoolIndex = i'}
       return i
 
 -- | Lookup in a pool
@@ -177,9 +204,7 @@ addToPool c = addItem c
 
 putInstruction :: (Generator e g) => Instruction -> g e ()
 putInstruction instr = do
-  st <- St.get
-  let code = generated st
-  St.put $ st {generated = code ++ [instr]}
+  modifyGState $ \st -> st {generated = generated st ++ [instr]}
 
 -- | Generate one (zero-arguments) instruction
 i0 :: (Generator e g) => Instruction -> g e ()
@@ -200,14 +225,12 @@ i8 fn c = do
 -- | Set maximum stack size for current method
 setStackSize :: (Generator e g) => Word16 -> g e ()
 setStackSize n = do
-  st <- St.get
-  St.put $ st {stackSize = n}
+  modifyGState $ \st -> st {stackSize = n}
 
 -- | Set maximum number of local variables for current method
 setMaxLocals :: (Generator e g) => Word16 -> g e ()
 setMaxLocals n = do
-  st <- St.get
-  St.put $ st {locals = n}
+  modifyGState $ \st -> st {locals = n}
 
 -- | Start generating new method
 startMethod :: (Generator e g) => [AccessFlag] -> B.ByteString -> MethodSignature -> g e ()
@@ -216,28 +239,28 @@ startMethod flags name sig = do
   addSig sig
   setStackSize 4096
   setMaxLocals 100
-  st <- St.get
+  st <- getGState
   let method = Method {
     methodAccessFlags = S.fromList flags,
     methodName = name,
     methodSignature = sig,
     methodAttributesCount = 0,
     methodAttributes = AR M.empty }
-  St.put $ st {generated = [],
+  putGState $ st {generated = [],
                currentMethod = Just method }
 
 -- | End of method generation
 endMethod :: (Generator e g, Throws UnexpectedEndMethod e) => g e ()
 endMethod = do
-  m <- St.gets currentMethod
-  code <- St.gets genCode
+  m <- getsGState currentMethod
+  code <- getsGState genCode
   case m of
     Nothing -> throwG UnexpectedEndMethod
     Just method -> do
       let method' = method {methodAttributes = AR $ M.fromList [("Code", encodeMethod code)],
                             methodAttributesCount = 1}
-      st <- St.get
-      St.put $ st {generated = [],
+      modifyGState $ \st -> 
+               st {generated = [],
                    currentMethod = Nothing,
                    doneMethods = doneMethods st ++ [method']}
 
@@ -260,7 +283,7 @@ newMethod flags name args ret gen = do
 getClass :: (Throws ENotLoaded e, Throws ENotFound e)
          => String -> GenerateIO e (Class Direct)
 getClass name = do
-  cp <- St.gets classPath
+  cp <- getsGState classPath
   res <- liftIO $ getEntry cp name
   case res of
     Just (NotLoaded p) -> throwG (ClassFileNotLoaded p)
