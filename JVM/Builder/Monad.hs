@@ -88,7 +88,7 @@ class (Monad (g e), GeneratorMonad (g e)) => Generator e g where
 -- | Generate monad
 newtype Generate e a = Generate {
   runGenerate :: EMT e (State GState) a }
-  deriving (Monad, MonadState GState)
+  deriving (Functor, Applicative, Monad, MonadState GState)
 
 -- instance GeneratorMonad (Generate e) where
 --   getGState = Generate $ St.get
@@ -105,7 +105,7 @@ instance MonadState st (EMT e (State st)) where
 -- | IO version of Generate monad
 newtype GenerateIO e a = GenerateIO {
   runGenerateIO :: EMT e (StateT GState IO) a }
-  deriving (Monad, MonadIO, MonadState GState)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadState GState)
 
 -- instance GeneratorMonad (GenerateIO e) where
 --   getGState = GenerateIO $ St.get
@@ -153,7 +153,7 @@ addItem c = do
           i' = if long c
                  then i+2
                  else i+1
-      modifyGState $ \st -> 
+      modifyGState $ \st ->
             st {currentPool = pool',
                 nextPoolIndex = i'}
       return i
@@ -259,7 +259,7 @@ endMethod = do
     Just method -> do
       let method' = method {methodAttributes = AR $ M.fromList [("Code", encodeMethod code)],
                             methodAttributesCount = 1}
-      modifyGState $ \st -> 
+      modifyGState $ \st ->
                st {generated = [],
                    currentMethod = Nothing,
                    doneMethods = doneMethods st ++ [method']}
@@ -377,4 +377,3 @@ generate cp name gen =
         superClass = "java/lang/Object",
         classMethodsCount = fromIntegral $ length (doneMethods res),
         classMethods = doneMethods res }
-
