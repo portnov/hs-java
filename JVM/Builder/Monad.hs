@@ -68,7 +68,7 @@ class Monad m => GeneratorMonad m where
   getGState :: m GState
   putGState :: GState -> m ()
 
-instance MonadState GState m => GeneratorMonad m where
+instance (Monad m, MonadState GState m) => GeneratorMonad m where
   getGState = St.get
   putGState = St.put
 
