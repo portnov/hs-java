@@ -21,7 +21,7 @@ import Java.JAR.Archive
 -- | For given list of glob masks, return list of matching files
 glob :: FilePath -> [FilePath] -> IO [FilePath]
 glob dir patterns = do
-  (matches, _) <- globDir (map compile patterns) dir
+  matches <- globDir (map compile patterns) dir
   return $ concat matches
 
 -- | Append one file to ClassPath forest
@@ -97,4 +97,3 @@ getEntry cp path = get cp (split "/" path)
       | toString (thisClass c) == path = return (Just i)
       | otherwise = get es [p]
     get x y = fail $ "Unexpected arguments for ClassPath.getEntry.get: " ++ show x ++ ", " ++ show y
-
