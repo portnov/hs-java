@@ -473,14 +473,14 @@ instance BinaryState Integer Instruction where
   put  LCMP           = putByte 148
   put (FCMP C_LT)     = putByte 149
   put (FCMP C_GT)     = putByte 150
-  put (FCMP c)        = fail $ "No such instruction: FCMP " ++ show c
+  put (FCMP c)        = error $ "No such instruction: FCMP " ++ show c
   put (DCMP C_LT)     = putByte 151
   put (DCMP C_GT)     = putByte 152
-  put (DCMP c)        = fail $ "No such instruction: DCMP " ++ show c
+  put (DCMP c)        = error $ "No such instruction: DCMP " ++ show c
   put (IF c x)        = putByte (fromIntegral $ 153 + fromEnum c) >> put x
   put (IF_ACMP C_EQ x) = put1 165 x
   put (IF_ACMP C_NE x) = put1 166 x
-  put (IF_ACMP c _)   = fail $ "No such instruction: IF_ACMP " ++ show c
+  put (IF_ACMP c _)   = error $ "No such instruction: IF_ACMP " ++ show c
   put (IF_ICMP c x)   = putByte (fromIntegral $ 159 + fromEnum c) >> put x
   put (GOTO x)        = put1 167 x
   put (JSR x)         = put1 168 x

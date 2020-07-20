@@ -41,7 +41,7 @@ packages:
 # (e.g., acme-missiles-0.3)
 extra-deps:
 - binary-state-0.1.1
-- control-monad-exception-0.11.2
+- control-monad-exception-0.11.4
 - failure-0.2.0.3
 
 # Override default flag values for local packages and extra-deps

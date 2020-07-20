@@ -11,3 +11,4 @@ dist/
 MANIFEST.MF
 META-INF
 *.jar
+.stack-work
